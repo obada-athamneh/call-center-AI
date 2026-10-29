@@ -7,8 +7,8 @@ Set-Location $PSScriptRoot
 Write-Host "=== Pipecat voice demo ===" -ForegroundColor Cyan
 
 # 0. Check files and Git
-if (-not (Test-Path ".\demo_bot.py")) {
-    Write-Host "demo_bot.py was not found. Put it in the same folder as this script." -ForegroundColor Red
+if (-not (Test-Path ".\demo_bot.py") -or -not (Test-Path ".\bot_core.py")) {
+    Write-Host "demo_bot.py or bot_core.py was not found. Put them in the same folder as this script." -ForegroundColor Red
     exit 1
 }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -68,6 +68,8 @@ Ensure-Key "GOOGLE_API_KEY" "Gemini API key for the Gemini voice (or just press 
 
 # 6. Copy the bot in and open the browser once the server is up
 Copy-Item "..\demo_bot.py" ".\demo_bot.py" -Force
+if (-not (Test-Path "..\bot_core.py")) { throw "bot_core.py was not found. Put it next to this script." }
+Copy-Item "..\bot_core.py" ".\bot_core.py" -Force
 if (-not (Test-Path "..\company_info.txt")) { throw "company_info.txt was not found. Put it next to this script." }
 Copy-Item "..\company_info.txt" ".\company_info.txt" -Force
 if (Test-Path "..\hayat_ui.html") { Copy-Item "..\hayat_ui.html" ".\hayat_ui.html" -Force }

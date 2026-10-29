@@ -392,9 +392,44 @@
 <audio id="botAudio" autoplay playsinline></audio>
 
 <script type="module">
-  // Official Pipecat browser SDK - same versions the Playground uses.
+  // Official Pipecat browser SDK.
   import { PipecatClient } from "https://esm.sh/@pipecat-ai/client-js@1.15.0";
-  import { SmallWebRTCTransport } from "https://esm.sh/@pipecat-ai/small-webrtc-transport@1.11.1?deps=@pipecat-ai/client-js@1.15.0";
+
+  // Where is this page running?
+  //  - on your computer (localhost): WebRTC, via demo_bot.py
+  //  - online (Render, Railway, ...): WebSocket at /ws, via app.py
+  const IS_LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const ACCESS_CODE = new URLSearchParams(location.search).get("code") || "";
+
+  async function makeTransport() {
+    if (IS_LOCAL) {
+      const { SmallWebRTCTransport } = await import(
+        "https://esm.sh/@pipecat-ai/small-webrtc-transport@1.11.1?deps=@pipecat-ai/client-js@1.15.0");
+      return new SmallWebRTCTransport();
+    }
+    const { WebSocketTransport } = await import(
+      "https://esm.sh/@pipecat-ai/websocket-transport@1.8.1?deps=@pipecat-ai/client-js@1.15.0");
+    return new WebSocketTransport();
+  }
+
+  function connectParams() {
+    if (IS_LOCAL) return { webrtcRequestParams: { endpoint: "/api/offer" } };
+    const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
+      + (ACCESS_CODE ? `?code=${encodeURIComponent(ACCESS_CODE)}` : "");
+    return { wsUrl };
+  }
+
+  // Ask the server whether the call can start, to give a clear message if not.
+  async function preflight() {
+    if (IS_LOCAL) return null;
+    try {
+      const r = await fetch("/health", { cache: "no-store" });
+      const h = await r.json();
+      if (!h.openai_key_set) return "المفتاح OPENAI_API_KEY مش محطوط بإعدادات السيرفر (Environment).";
+      if (h.access_code_required && !ACCESS_CODE) return "هاد الرابط محمي بكلمة سر. افتح الرابط مع ?code=كلمة_السر بآخره.";
+    } catch { /* server may be waking up; let the call try anyway */ }
+    return null;
+  }
 
   const $ = (id) => document.getElementById(id);
   const root = document.documentElement;
@@ -403,6 +438,9 @@
 
   let client = null;
   let micMuted = false;
+
+  // The original Playground only exists on your computer.
+  if (!IS_LOCAL) document.querySelector(".classic")?.remove();
 
   // ---------- UI helpers ----------
   const STATUS = {
@@ -538,8 +576,27 @@
     ensureAudioContext();
     botAudio.play().catch(() => {}); // unlock audio playback during the click
 
+    const problem = await preflight();
+    if (problem) {
+      addNotice(problem);
+      resetUI(true);
+      callBtn.disabled = false;
+      return;
+    }
+
+    let transport;
+    try {
+      transport = await makeTransport();
+    } catch (err) {
+      console.error(err);
+      addNotice("ما قدرنا نحمّل أدوات الاتصال. تأكد من الإنترنت وجرّب مرة ثانية.");
+      resetUI(true);
+      callBtn.disabled = false;
+      return;
+    }
+
     client = new PipecatClient({
-      transport: new SmallWebRTCTransport(),
+      transport,
       enableMic: true,
       enableCam: false,
       callbacks: {
@@ -563,14 +620,15 @@
         },
         onError: (msg) => {
           console.error("Pipecat error", msg);
-          addNotice("صار خطأ بالمحادثة. شوف نافذة PowerShell لتعرف السبب.");
+          addNotice(IS_LOCAL
+            ? "صار خطأ بالمحادثة. شوف نافذة PowerShell لتعرف السبب."
+            : "صار خطأ بالمحادثة. شوف الـ Logs بلوحة الاستضافة لتعرف السبب.");
         },
       },
     });
 
     try {
-      // Same WebRTC endpoint the Pipecat Playground uses.
-      await client.connect({ webrtcRequestParams: { endpoint: "/api/offer" } });
+      await client.connect(connectParams());
       callBtn.dataset.mode = "end";
       callBtn.textContent = "إنهاء المكالمة";
       micBtn.hidden = false;
@@ -580,7 +638,9 @@
       const blocked = /permission|notallowed|denied/i.test(String(err?.name || err?.message || err));
       addNotice(blocked
         ? "المتصفح مانع المايكروفون. اضغط على القفل جنب عنوان الصفحة، خلي Microphone على Allow، وبعدين جرّب مرة ثانية."
-        : "ما قدرنا نوصل للمساعد. تأكد إنه نافذة PowerShell لسا شغالة والبوت مكتوب فيها إنه جاهز، وبعدين جرّب مرة ثانية.");
+        : IS_LOCAL
+          ? "ما قدرنا نوصل للمساعد. تأكد إنه نافذة PowerShell لسا شغالة والبوت مكتوب فيها إنه جاهز، وبعدين جرّب مرة ثانية."
+          : "ما قدرنا نوصل للمساعد. إذا السيرفر كان نايم، استنى دقيقة وجرّب مرة ثانية.");
       try { await client?.disconnect(); } catch {}
       resetUI(true);
     } finally {

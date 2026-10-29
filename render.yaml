@@ -1,0 +1,17 @@
+# Render settings for this project (used if you deploy it as a Render "Blueprint").
+# The same values can be typed by hand when creating a Web Service.
+services:
+  - type: web
+    name: call-center-ai
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: OPENAI_API_KEY
+        sync: false   # you paste the key in the Render dashboard
+      - key: ACCESS_CODE
+        sync: false   # optional password for the link

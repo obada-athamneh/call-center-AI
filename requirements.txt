@@ -1,0 +1,6 @@
+# Used by the hosting platform (Render) to install the bot (app.py).
+# Your computer uses run-pipecat-demo.ps1 instead.
+pipecat-ai[openai,google,silero,websocket]==1.14.0
+fastapi>=0.115.6,<1
+uvicorn[standard]>=0.32
+python-dotenv>=1.0
