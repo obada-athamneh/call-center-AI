@@ -50,6 +50,8 @@ async def health():
             "openai_key_set": bool(os.getenv("OPENAI_API_KEY")),
             "voice": "gemini" if os.getenv("GOOGLE_API_KEY") else "openai",
             "access_code_required": bool(os.getenv("ACCESS_CODE")),
+            "n8n_webhook_set": bool(os.getenv("N8N_WEBHOOK_URL", "").strip()),
+            "unanswered_logging": "v2",
         }
     )
 
