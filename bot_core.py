@@ -6,7 +6,9 @@
 #
 
 import os
+import uuid
 
+import aiohttp
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -19,6 +21,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openai.stt import OpenAIRealtimeSTTService
 from pipecat.services.openai.tts import OpenAITTSService
@@ -42,13 +45,41 @@ GEMINI_VOICE = "Puck"
 SYSTEM_INSTRUCTION = (
     "You are the voice customer-service assistant for Al Hayat Renewable Energy "
     "(شركة الحياة للطاقة المتجددة). Answer questions using ONLY the company "
-    "information below. If the answer is not in it, say you don't have that "
-    "information and suggest calling the company. Reply in the same language the "
+    "information below. If the answer is not in it, first call the "
+    "log_unanswered_question tool (once per question), then tell the caller you don't "
+    "have that information yet, that you passed the question to the team, and suggest "
+    "calling the company. Never guess or invent information. Reply in the same language the "
     "user speaks (Arabic or English). Your responses will be spoken aloud, so keep "
     "them short and avoid emojis, bullet points, or other formatting that can't be "
     "spoken.\n\n"
     "=== COMPANY INFORMATION ===\n" + COMPANY_INFO
 )
+
+
+# n8n webhook that saves questions the bot couldn't answer
+# (workflow "Unanswered Questions — Voice Bot→Data Table").
+# Set N8N_WEBHOOK_URL in .env (your computer) or in the hosting dashboard (online).
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "").strip()
+
+
+async def send_unanswered_question(payload: dict) -> bool:
+    """POST one unanswered question to n8n. Never raises: a logging failure must not break the call."""
+    if not N8N_WEBHOOK_URL:
+        logger.warning(f"N8N_WEBHOOK_URL not set; unanswered question not saved: {payload.get('question')}")
+        return False
+    try:
+        timeout = aiohttp.ClientTimeout(total=8)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(N8N_WEBHOOK_URL, json=payload) as resp:
+                ok = resp.status == 200
+                if ok:
+                    logger.info(f"Saved unanswered question to n8n: {payload.get('question')}")
+                else:
+                    logger.warning(f"n8n returned {resp.status} for unanswered question")
+                return ok
+    except Exception as e:
+        logger.warning(f"Could not reach n8n to save unanswered question: {e}")
+        return False
 
 
 def make_tts():
@@ -76,9 +107,35 @@ async def run_bot(
     transport: BaseTransport,
     idle_timeout_secs: int | None = 300,
     handle_sigint: bool = False,
+    source: str = "voice-bot",
 ):
     """Run one conversation on the given transport until the caller hangs up."""
     logger.info("Starting bot")
+    session_id = uuid.uuid4().hex[:12]
+
+    async def log_unanswered_question(
+        params: FunctionCallParams, question: str, missing_info: str, language: str
+    ):
+        """Save a customer question that cannot be answered from the company information.
+
+        Call this only when the answer is NOT in the company information, before telling
+        the caller you don't have that information. Call it once per question.
+
+        Args:
+            question: The caller's question, written in the caller's own words and language.
+            missing_info: Short description of the information that is missing, e.g. "سعر نظام 20 كيلوواط".
+            language: Language of the question: "ar" for Arabic or "en" for English.
+        """
+        saved = await send_unanswered_question(
+            {
+                "question": question,
+                "missing_info": missing_info,
+                "language": language,
+                "session_id": session_id,
+                "source": source,
+            }
+        )
+        await params.result_callback({"saved": saved})
 
     # 1) Ears: OpenAI speech-to-text
     stt = OpenAIRealtimeSTTService(api_key=os.environ["OPENAI_API_KEY"])
@@ -93,7 +150,7 @@ async def run_bot(
     tts = make_tts()
 
     # Conversation memory + voice activity detection (knows when you stop talking)
-    context = LLMContext()
+    context = LLMContext(tools=[log_unanswered_question])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),

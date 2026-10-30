@@ -60,9 +60,27 @@ The original Pipecat Playground is still available at http://localhost:7860/clas
    - `PYTHON_VERSION`: `3.12.8`
    - `ACCESS_CODE`: a password (optional). Then share the link as `https://your-app.onrender.com/?code=PASSWORD`
    - `GOOGLE_API_KEY`: only if you want the Gemini voice
+   - `N8N_WEBHOOK_URL`: the n8n webhook that saves unanswered questions (see below)
 4. Deploy. Check `https://your-app.onrender.com/health` shows `"openai_key_set": true`.
 
 On Render's free plan the server sleeps after 15 minutes without use and takes about a minute to wake up. Open the link a minute before a demo.
+
+## Unanswered questions (n8n)
+
+When a caller asks something that isn't in `company_info.txt`, the bot calls its
+`log_unanswered_question` tool, which POSTs the question to an n8n webhook
+(`N8N_WEBHOOK_URL`). The n8n workflow **Unanswered Questions — Voice Bot→Data Table**
+saves it in the data table **Al Hayat — Unanswered Questions** with the time
+(Asia/Amman), the question, what info was missing, the language, a session id,
+and whether the call came from `local` or `online`.
+
+Use that table to decide what to add to `company_info.txt` next.
+
+On your computer, add the same URL to `pipecat\.env`:
+```
+N8N_WEBHOOK_URL=https://<your-n8n>/webhook/<path>
+```
+Without it the bot still works; the questions just aren't saved.
 
 ## Notes
 

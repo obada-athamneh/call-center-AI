@@ -15,3 +15,5 @@ services:
         sync: false   # you paste the key in the Render dashboard
       - key: ACCESS_CODE
         sync: false   # optional password for the link
+      - key: N8N_WEBHOOK_URL
+        sync: false   # n8n webhook that saves questions the bot couldn't answer

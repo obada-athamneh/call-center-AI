@@ -85,6 +85,6 @@ async def ws_endpoint(websocket: WebSocket):
         ),
     )
     try:
-        await run_bot(transport, idle_timeout_secs=120, handle_sigint=False)
+        await run_bot(transport, idle_timeout_secs=120, handle_sigint=False, source="online")
     except Exception:
         logger.exception("Bot session ended with an error")

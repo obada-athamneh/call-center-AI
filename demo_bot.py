@@ -55,6 +55,7 @@ async def bot(runner_args: RunnerArguments):
         transport,
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
         handle_sigint=runner_args.handle_sigint,
+        source="local",
     )
 
 
