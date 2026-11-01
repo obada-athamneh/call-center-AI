@@ -9,6 +9,7 @@
 import os
 
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from pipecat.runner.run import app as runner_app
 from pipecat.runner.types import RunnerArguments
@@ -30,6 +31,9 @@ if os.path.exists(_ui_file):
     @runner_app.get("/hayat", include_in_schema=False)
     async def hayat_ui():
         return FileResponse(_ui_file)
+
+    # The website app (built from web/ into ui/app.js).
+    runner_app.mount("/ui", StaticFiles(directory=os.path.join(HERE, "ui")), name="ui")
 
     try:
         from pipecat_ai_prebuilt.frontend import PipecatPrebuiltUI

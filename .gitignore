@@ -2,3 +2,4 @@ pipecat/
 .env
 .skip_*
 __pycache__/
+node_modules/

@@ -70,6 +70,8 @@ Ensure-Key "GOOGLE_API_KEY" "Gemini API key for the Gemini voice (or just press 
 Copy-Item "..\demo_bot.py" ".\demo_bot.py" -Force
 if (-not (Test-Path "..\bot_core.py")) { throw "bot_core.py was not found. Put it next to this script." }
 Copy-Item "..\bot_core.py" ".\bot_core.py" -Force
+Copy-Item "..\ui_tools.py" ".\ui_tools.py" -Force
+if (Test-Path "..\ui") { Copy-Item "..\ui" ".\ui" -Recurse -Force }
 if (-not (Test-Path "..\company_info.txt")) { throw "company_info.txt was not found. Put it next to this script." }
 Copy-Item "..\company_info.txt" ".\company_info.txt" -Force
 if (Test-Path "..\hayat_ui.html") { Copy-Item "..\hayat_ui.html" ".\hayat_ui.html" -Force }

@@ -16,6 +16,7 @@ import os
 
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
@@ -28,6 +29,9 @@ from bot_core import HERE, run_bot
 
 app = FastAPI()
 UI_FILE = os.path.join(HERE, "hayat_ui.html")
+
+# The website app (built from web/ into ui/app.js).
+app.mount("/ui", StaticFiles(directory=os.path.join(HERE, "ui")), name="ui")
 
 
 @app.get("/", include_in_schema=False)
@@ -52,6 +56,7 @@ async def health():
             "access_code_required": bool(os.getenv("ACCESS_CODE")),
             "n8n_webhook_set": bool(os.getenv("N8N_WEBHOOK_URL", "").strip()),
             "unanswered_logging": "v2",
+            "screen_tools": "v1",
         }
     )
 

@@ -2,7 +2,8 @@
 # The voice bot itself: OpenAI ears + OpenAI brain + OpenAI or Gemini voice.
 # Shared by both ways of running the project:
 #   - demo_bot.py  -> on your computer (WebRTC, run-pipecat-demo.ps1)
-#   - app.py       -> on Vercel (WebSocket)
+#   - app.py       -> online, e.g. Render (WebSocket)
+# Screen tools that move the caller around the website live in ui_tools.py.
 #
 
 import os
@@ -21,12 +22,15 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
+from pipecat.processors.frameworks.rtvi import RTVIProcessor
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openai.stt import OpenAIRealtimeSTTService
 from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.workers.runner import WorkerRunner
+
+from ui_tools import UIBridge, build_ui_tools
 
 load_dotenv(override=True)
 
@@ -54,6 +58,8 @@ SYSTEM_INSTRUCTION = (
     "answer with a guess like \"we probably don't\" or \"it would be about\". Call the tool "
     "once per question, then tell the caller you don't have that information yet, that you "
     "passed the question to the team, and suggest calling the company.\n\n"
+    "SCREEN: whenever you talk about something from the company information, call the "
+    "matching show tool so the caller sees it on the screen, and follow the hint it returns.\n\n"
     "Reply in the same language the "
     "user speaks (Arabic or English). Your responses will be spoken aloud, so keep "
     "them short and avoid emojis, bullet points, or other formatting that can't be "
@@ -156,7 +162,11 @@ async def run_bot(
     tts = make_tts()
 
     # Conversation memory + voice activity detection (knows when you stop talking)
-    context = LLMContext(tools=[log_unanswered_question])
+    # Screen tools (ui_tools.py): the browser runs them and answers with a hint.
+    rtvi = RTVIProcessor()
+    ui_bridge = UIBridge(rtvi)
+
+    context = LLMContext(tools=[log_unanswered_question, *build_ui_tools(ui_bridge)])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
@@ -185,6 +195,7 @@ async def run_bot(
         ),
         idle_timeout_secs=idle_timeout_secs,
         processor_unusable_policy=ProcessorUnusablePolicy.END,
+        rtvi_processor=rtvi,
     )
 
     runner = WorkerRunner(handle_sigint=handle_sigint)

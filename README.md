@@ -14,7 +14,8 @@ Built on [Pipecat](https://github.com/pipecat-ai/pipecat).
 | Speech to text (ears) | OpenAI |
 | Reply (brain) | OpenAI, using `company_info.txt` |
 | Text to speech (voice) | OpenAI, or Gemini if `GOOGLE_API_KEY` is set |
-| Interface | `hayat_ui.html` |
+| Website | `hayat_ui.html` + `ui/app.js` (built from `web/`, see `web/README.md`) |
+| Screen tools | `ui_tools.py`: the bot scrolls to and highlights what it talks about |
 
 It runs in two ways:
 
@@ -64,6 +65,15 @@ The original Pipecat Playground is still available at http://localhost:7860/clas
 4. Deploy. Check `https://your-app.onrender.com/health` shows `"openai_key_set": true`.
 
 On Render's free plan the server sleeps after 15 minutes without use and takes about a minute to wake up. Open the link a minute before a demo.
+
+## Screen tools
+
+While it talks, the bot calls tools like `show_prices`, `show_branches` or
+`book_site_visit`. The browser runs them: it scrolls to the right section,
+highlights the item, opens the FAQ answer or fills the visit form, then sends
+back a short `hint` telling the bot what to say next. Navigation is
+client-side only, so the call never drops. Server side: `ui_tools.py`.
+Browser side: `web/tools.js`.
 
 ## Unanswered questions (n8n)
 
